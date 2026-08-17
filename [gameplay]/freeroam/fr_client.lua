@@ -154,11 +154,35 @@ function showSkinID(leaf)
 	end
 end
 
+local invalidSkinIDs = {
+	[74] = true,
+	[149] = true,
+	[208] = true,
+}
+
+local function isValidSkinID(skinID)
+	skinID = tonumber(skinID)
+	if not skinID or skinID ~= math.floor(skinID) then
+		return false
+	end
+	return skinID >= 0 and skinID <= 312 and not invalidSkinIDs[skinID]
+end
+
+local function isValidVehicleID(vehicleID)
+	vehicleID = tonumber(vehicleID)
+	if not vehicleID or vehicleID ~= math.floor(vehicleID) then
+		return false
+	end
+	return vehicleID >= 400 and vehicleID <= 611
+end
+
 function applySkin()
 	local skinID = getControlNumber(wndSkin, 'skinid')
-	if skinID then
+	if isValidSkinID(skinID) then
 		server.setMySkin(skinID)
 		fadeCamera(true)
+	else
+		errMsg("Invalid skin model!")
 	end
 end
 
@@ -198,13 +222,13 @@ function setSkinCommand(cmd, skin)
 
 	skin = tonumber(skin)
 
-	if skin and skin == math.floor(skin) then
+	if isValidSkinID(skin) then
 		server.setMySkin(skin)
 		fadeCamera(true)
 		closeWindow(wndSpawnMap)
 		closeWindow(wndSetPos)
 	else
-		errMsg("Invalid skin ID! Usage: /ss [id]")
+		errMsg("Invalid skin model!")
 	end
 end
 addCommandHandler('setskin', setSkinCommand)
@@ -1482,12 +1506,31 @@ wndSetInterior = {
 ---------------------------
 function createSelectedVehicle(leaf)
 	if not leaf then
+		local vehID = getControlNumber(wndCreateVehicle, 'vehicleid')
+		if vehID then
+			vehID = tonumber(vehID)
+			if isValidVehicleID(vehID) then
+				server.giveMeVehicles(vehID)
+			else
+				errMsg("Invalid vehicle model!")
+			end
+			return
+		end
 		leaf = getSelectedGridListLeaf(wndCreateVehicle, 'vehicles')
 		if not leaf then
 			return
 		end
 	end
-	server.giveMeVehicles(leaf.id)
+
+	if leaf and leaf.id then
+		server.giveMeVehicles(leaf.id)
+	end
+end
+
+function showVehicleID(leaf)
+	if leaf and leaf.id then
+		setControlNumber(wndCreateVehicle, 'vehicleid', leaf.id)
+	end
 end
 
 wndCreateVehicle = {
@@ -1504,33 +1547,34 @@ wndCreateVehicle = {
 				{text='Vehicle', attr='name'}
 			},
 			rows={xml='data/vehicles.xml', attrs={'id', 'name'}},
+			onitemclick=showVehicleID,
 			onitemdoubleclick=createSelectedVehicle,
 			DoubleClickSpamProtected=true,
 		},
+		{'txt', id='vehicleid', text='', width=60},
 		{'btn', id='create', onclick=createSelectedVehicle, ClickSpamProtected=true},
 		{'btn', id='close', closeswindow=true}
 	}
 }
 
 function createVehicleCommand(cmd, ...)
-
 	local args = {...}
+	local rawInput = table.concat(args, ' ')
 
-	if not ... then
+	if not rawInput or rawInput == '' then
 		return errMsg("Enter vehicle model please! Syntax: /cv [vehicle ID/name]")
 	end
 
-	vehID = getVehicleModelFromName(table.concat(args, " ")) or tonumber(args[1]) and math.floor(tonumber(args[1])) or false
-
-	if not vehID or not tostring(vehID) or not tonumber(vehID) then
+	if string.len(rawInput) > 25 then
 		return errMsg("Invalid vehicle model!")
 	end
 
-	if string.len(table.concat(args, " ")) > 25 or tonumber(vehID) and string.len(vehID) > 3 then
+	local vehID = getVehicleModelFromName(rawInput) or tonumber(rawInput) and math.floor(tonumber(rawInput)) or false
+	if not vehID or not tonumber(vehID) then
 		return errMsg("Invalid vehicle model!")
 	end
 
-	if vehID and vehID >= 400 and vehID <= 611 then
+	if isValidVehicleID(vehID) then
 		server.giveMeVehicles(vehID)
 	else
 		errMsg("Invalid vehicle model!")
